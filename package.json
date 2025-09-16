@@ -1,6 +1,6 @@
 {
   "name": "import-export-web",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Import and export Strapi data with a web interface",
   "keywords": ["strapi", "plugin", "import", "export", "backup", "data"],
   "type": "commonjs",
