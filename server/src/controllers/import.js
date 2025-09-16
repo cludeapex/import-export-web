@@ -5,19 +5,11 @@ export default ({ strapi }) => ({
   async handler(ctx) {
     try {
       const { files = {}, body = {} } = ctx.request;
-      
       const { archive } = files;
-
-      if (!archive?.path) {
-        throw new Error("Missing uploaded archive file");
-      }
+      if (!archive?.path) throw new Error("Missing uploaded archive file");
 
       const filePath = join(dirname(archive.path), archive.name);
-
-      const encryptionKey = strapi
-        .plugin('import-export-web')
-        .config("encryptionKey", undefined);
-
+      const encryptionKey = strapi.plugin('import-export-web').config("encryptionKey", undefined);
       await rename(archive.path, filePath);
 
       const options = {
@@ -26,18 +18,19 @@ export default ({ strapi }) => ({
 
       if (body.exclude) {
         try {
-          options.exclude = typeof body.exclude === 'string' 
-            ? JSON.parse(body.exclude) 
-            : body.exclude;
+          options.exclude = typeof body.exclude === 'string' ? JSON.parse(body.exclude) : body.exclude;
         } catch (e) {
           console.warn('Failed to parse exclude parameter:', e);
         }
       }
 
-      const success = await strapi
-        .plugin('import-export-web')
-        .service('import')
-        .run(filePath, options, encryptionKey);
+      const includeFiles = body.includeFiles === 'true' || body.includeFiles === true;
+      if (!includeFiles) {
+        options.exclude = options.exclude || [];
+        if (!options.exclude.includes('files')) options.exclude.push('files');
+      }
+
+      const success = await strapi.plugin('import-export-web').service('import').run(filePath, options, encryptionKey);
 
       if (success) {
         ctx.status = 200;

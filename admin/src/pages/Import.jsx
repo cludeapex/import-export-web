@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { 
-  Button, 
-  Box, 
+import {
+  Button,
+  Box,
   Typography,
   Flex,
   Alert,
@@ -42,15 +42,12 @@ const Import = () => {
 
       const formData = new FormData();
       formData.append('archive', selectedFile);
-      
+      formData.append('includeFiles', includeFiles ? 'true' : 'false');
+      formData.append('skipAssets', !includeFiles);
+
       if (!includeFiles) {
         formData.append('exclude', JSON.stringify(['files']));
-        console.log('Starting import with file:', selectedFile.name, 'excluding files');
-      } else {
-        console.log('Starting import with file:', selectedFile.name, 'including all data types');
       }
-      
-      formData.append('skipAssets', !includeFiles);
 
       const response = await fetch('/import-export-web', {
         method: 'POST',
@@ -68,9 +65,7 @@ const Import = () => {
       if (response.status === 200) {
         setSuccess(true);
         setSelectedFile(null);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+        if (fileInputRef.current) fileInputRef.current.value = '';
       }
     } catch (err) {
       setError(err.message || formatMessage({
@@ -161,7 +156,7 @@ const Import = () => {
                 cursor: isLoading ? 'not-allowed' : 'pointer'
               }}
             />
-            <label 
+            <label
               htmlFor="includeFiles"
               style={{
                 cursor: isLoading ? 'not-allowed' : 'pointer',
@@ -203,7 +198,7 @@ const Import = () => {
             loading={isLoading}
             startIcon={!isLoading && <Upload />}
           >
-            {isLoading 
+            {isLoading
               ? formatMessage({
                   id: 'import-export-web.import.button.loading',
                   defaultMessage: 'Importing...'
@@ -225,7 +220,7 @@ const Import = () => {
               defaultMessage: 'Reset'
             })}
           </Button>
-          
+
         </Flex>
       </Flex>
     </Flex>
