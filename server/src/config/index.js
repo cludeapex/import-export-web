@@ -5,6 +5,7 @@ export default {
     maxFileAge: 7 * 24 * 60 * 60 * 1000,
     maxFileSize: 2 * 1024 * 1024 * 1024,
     autoCleanup: true,
+    enableImport: false,
   },
   validator(config) {
     if (config.tempDir && typeof config.tempDir !== 'string') {
@@ -21,6 +22,9 @@ export default {
     }
     if (typeof config.autoCleanup !== 'boolean') {
       throw new Error('autoCleanup must be a boolean');
+    }
+    if (typeof config.enableImport !== 'boolean') {
+      throw new Error('enableImport must be a boolean');
     }
   },
 };

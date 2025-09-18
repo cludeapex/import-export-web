@@ -8,6 +8,16 @@ const controller = ({ strapi }) => ({
     ctx.body = strapi.plugin('import-export-web').service('service').getWelcomeMessage();
   },
 
+  settings(ctx) {
+    try {
+      const enableImport = !!strapi.plugin('import-export-web').config('enableImport', false);
+      ctx.body = { enableImport };
+    } catch (err) {
+      ctx.status = 500;
+      ctx.body = { error: err.message || 'Failed to load settings' };
+    }
+  },
+
   async export(ctx) {
     try {
       const tempDir = strapi.plugin('import-export-web').service('service').utils.getTempDir();

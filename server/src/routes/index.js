@@ -12,11 +12,20 @@ export default {
         },
       },
       {
+        method: 'GET',
+        path: '/settings',
+        handler: 'controller.settings',
+        config: {
+          policies: [],
+          auth: false,
+        },
+      },
+      {
         method: 'POST',
         path: '/',
         handler: 'controller.import',
         config: {
-          policies: [],
+          policies: ['isImportEnabled'],
           auth: false,
         },
         request: {

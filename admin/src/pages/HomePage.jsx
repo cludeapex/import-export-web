@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Box, 
   Typography,
@@ -13,6 +13,23 @@ import Import from './Import';
 
 const HomePage = () => {
   const { formatMessage } = useIntl();
+  const [enableImport, setEnableImport] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadSettings = async () => {
+      try {
+        const res = await fetch('/import-export-web/settings', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (isMounted) setEnableImport(!!data.enableImport);
+      } catch (_) {
+        // ignore
+      }
+    };
+    loadSettings();
+    return () => { isMounted = false; };
+  }, []);
 
   return (
     <Box padding={8}>
@@ -57,7 +74,7 @@ const HomePage = () => {
             <Export />
           </Box>
         </Grid.Item>
-        
+        {enableImport && (
         <Grid.Item col={6}>
           <Box
             hasRadius
@@ -74,6 +91,7 @@ const HomePage = () => {
             <Import />
           </Box>
         </Grid.Item>
+        )}
       </Grid.Root>
     </Box>
   );
