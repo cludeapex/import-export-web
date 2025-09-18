@@ -38,7 +38,7 @@ export default ({ strapi }) => ({
       const stds = await _exec(crossPlatformCommand, {
         cwd: process.cwd(),
         env: { ...process.env },
-        timeout: 300000,
+        timeout: 1800000, // 30 минут вместо 5
       });
       
       return stds;

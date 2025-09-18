@@ -26,17 +26,31 @@ export default ({ strapi }) => ({
       }
 
       const includeFiles = options?.includeFiles === true || options?.includeFiles === 'true';
+      console.log(`[IMPORT] includeFiles evaluation: options.includeFiles="${options?.includeFiles}" (${typeof options?.includeFiles}) -> includeFiles=${includeFiles}`);
+      console.log(`[IMPORT] Before exclude logic: excludeOption="${excludeOption}" onlyOption="${onlyOption}"`);
+      
       if (!includeFiles && !excludeOption && !onlyOption) {
         excludeOption = '--exclude files';
+        console.log(`[IMPORT] Added exclude files because includeFiles=${includeFiles}`);
       }
 
       const command = `npx strapi import --force --file "${filePath}" ${encryptionOption} ${excludeOption} ${onlyOption}`.trim();
 
+      console.log(`[IMPORT] Executing command: ${command}`);
+
       const { stdout, stderr } = await strapi.plugin('import-export-web').service('service').utils.execCommand(command);
+
+      if (stdout) {
+        console.log(`[IMPORT] Command stdout:`, stdout);
+      }
+      if (stderr) {
+        console.log(`[IMPORT] Command stderr:`, stderr);
+      }
 
       const success = stdout.includes("completed successfully") ||
         stdout.includes("Import completed") ||
         stdout.includes("successfully") ||
+        stderr.includes("transferred") || 
         (!stderr && stdout.length > 0);
 
       return success;

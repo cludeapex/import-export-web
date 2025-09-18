@@ -13,10 +13,19 @@ export default ({ strapi }) => ({
 
       const command = `npx strapi export --file ${filePath} ${encryptionOption} ${optionsString}`.trim();
 
-      await strapi
+      console.log(`[EXPORT] Executing command: ${command}`);
+      
+      const { stdout, stderr } = await strapi
         .plugin('import-export-web')
         .service('service')
         .utils.execCommand(command);
+
+      if (stdout) {
+        console.log(`[EXPORT] Command stdout:`, stdout);
+      }
+      if (stderr) {
+        console.log(`[EXPORT] Command stderr:`, stderr);
+      }
 
       const finalPath = strapi
         .plugin('import-export-web')

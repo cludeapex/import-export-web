@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Button,
   Box,
@@ -9,6 +9,7 @@ import {
 } from '@strapi/design-system';
 import { Upload, CheckCircle } from '@strapi/icons';
 import { useIntl } from 'react-intl';
+import { useOperationLock } from '../hooks/useOperationLock';
 
 const Import = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -16,14 +17,85 @@ const Import = () => {
   const [error, setError] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [includeFiles, setIncludeFiles] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [progressMessage, setProgressMessage] = useState('');
+  const [jobId, setJobId] = useState(null);
+  const eventSourceRef = useRef(null);
   const fileInputRef = useRef(null);
   const { formatMessage } = useIntl();
+  const { isAnyOperationRunning, lockOperation, unlockOperation, getCurrentOperation } = useOperationLock();
+
+  // Очистка EventSource при размонтировании
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, []);
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     setSelectedFile(file);
     setError(null);
     setSuccess(false);
+    setProgress(0);
+    setProgressMessage('');
+  };
+
+  const startSSEListener = (jobId) => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+
+    const eventSource = new EventSource(`/import-export-web/status/${jobId}`);
+    eventSourceRef.current = eventSource;
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        switch (data.type) {
+          case 'progress':
+            setProgress(data.progress || 0);
+            setProgressMessage(data.message || '');
+            break;
+          case 'finished':
+            setProgress(100);
+            setProgressMessage('Completed successfully');
+            setSuccess(true);
+            setSelectedFile(null);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            eventSource.close();
+            setIsLoading(false);
+            unlockOperation();
+            break;
+          case 'error':
+            setError(data.error || data.message);
+            eventSource.close();
+            setIsLoading(false);
+            setProgress(0);
+            setProgressMessage('');
+            unlockOperation();
+            break;
+          case 'ping':
+            // Keep connection alive
+            break;
+        }
+      } catch (err) {
+        console.error('Failed to parse SSE data:', err);
+      }
+    };
+
+    eventSource.onerror = (event) => {
+      console.error('SSE error:', event);
+      setError('Connection error');
+      eventSource.close();
+      setIsLoading(false);
+      setProgress(0);
+      setProgressMessage('');
+      unlockOperation();
+    };
   };
 
   const handleImport = async () => {
@@ -44,6 +116,7 @@ const Import = () => {
       formData.append('archive', selectedFile);
       formData.append('includeFiles', includeFiles ? 'true' : 'false');
       formData.append('skipAssets', !includeFiles);
+      formData.append('sse', 'true'); // Всегда используем SSE
 
       if (!includeFiles) {
         formData.append('exclude', JSON.stringify(['files']));
@@ -62,6 +135,16 @@ const Import = () => {
 
       const result = await response.json();
 
+      if (result.jobId) {
+        setJobId(result.jobId);
+        lockOperation('import', result.jobId);
+        startSSEListener(result.jobId);
+        setProgress(0);
+        setProgressMessage('Starting...');
+        // НЕ вызываем setIsLoading(false) - оставляем true для блокировки кнопки
+        return;
+      }
+
       if (response.status === 200) {
         setSuccess(true);
         setSelectedFile(null);
@@ -72,16 +155,28 @@ const Import = () => {
         id: 'import-export-web.import.error.title',
         defaultMessage: 'Import failed'
       }));
-    } finally {
+      // В случае ошибки всегда разблокируем
       setIsLoading(false);
+      unlockOperation();
+    } finally {
+      // finally не нужен для SSE режима
     }
   };
 
   const handleReset = () => {
+    // Закрываем SSE соединение если оно открыто
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+    
     setSelectedFile(null);
     setIncludeFiles(false);
     setError(null);
     setSuccess(false);
+    setProgress(0);
+    setProgressMessage('');
+    setIsLoading(false);
+    setJobId(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -143,25 +238,27 @@ const Import = () => {
         </Field.Root>
 
         <Box paddingTop={2}>
-          <Flex alignItems="center" gap={2}>
+          <Flex alignItems="flex-start" gap={2}>
             <input
               type="checkbox"
               id="includeFiles"
               checked={includeFiles}
               onChange={(e) => setIncludeFiles(e.target.checked)}
-              disabled={isLoading}
+              disabled={isLoading || isAnyOperationRunning}
               style={{
                 width: '16px',
                 height: '16px',
-                cursor: isLoading ? 'not-allowed' : 'pointer'
+                cursor: (isLoading || isAnyOperationRunning) ? 'not-allowed' : 'pointer',
+                marginTop: '2px'
               }}
             />
             <label
               htmlFor="includeFiles"
               style={{
-                cursor: isLoading ? 'not-allowed' : 'pointer',
+                cursor: (isLoading || isAnyOperationRunning) ? 'not-allowed' : 'pointer',
                 fontSize: '14px',
-                color: isLoading ? '#999' : 'inherit'
+                color: (isLoading || isAnyOperationRunning) ? '#999' : 'inherit',
+                lineHeight: '1.4'
               }}
             >
               {formatMessage({
@@ -194,26 +291,30 @@ const Import = () => {
           <Button
             onClick={handleImport}
             variant="primary"
-            disabled={isLoading || !selectedFile}
+            disabled={isLoading || !selectedFile || isAnyOperationRunning}
             loading={isLoading}
             startIcon={!isLoading && <Upload />}
           >
             {isLoading
-              ? formatMessage({
-                  id: 'import-export-web.import.button.loading',
-                  defaultMessage: 'Importing...'
-                })
-              : formatMessage({
-                  id: 'import-export-web.import.button.default',
-                  defaultMessage: 'Upload Archive'
-                })
+              ? (progress > 0 
+                  ? `Uploading... ${progress}%`
+                  : formatMessage({
+                      id: 'import-export-web.import.button.loading',
+                      defaultMessage: 'Importing...'
+                    }))
+              : isAnyOperationRunning
+                ? `${getCurrentOperation()?.type || 'Operation'} in progress...`
+                : formatMessage({
+                    id: 'import-export-web.import.button.default',
+                    defaultMessage: 'Upload Archive'
+                  })
             }
           </Button>
 
           <Button
             onClick={handleReset}
             variant="secondary"
-            disabled={isLoading}
+            disabled={isLoading || isAnyOperationRunning}
           >
             {formatMessage({
               id: 'import-export-web.import.button.reset',
@@ -222,6 +323,14 @@ const Import = () => {
           </Button>
 
         </Flex>
+
+        {isLoading && progressMessage && (
+          <Box paddingTop={2}>
+            <Typography variant="pi" textColor="neutral600">
+              {progressMessage}
+            </Typography>
+          </Box>
+        )}
       </Flex>
     </Flex>
   );

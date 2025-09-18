@@ -36,6 +36,15 @@ export default {
           },
         },
       },
+      {
+        method: 'GET',
+        path: '/status/:jobId',
+        handler: 'controller.status',
+        config: {
+          policies: [],
+          auth: false,
+        },
+      },
     ],
   },
 };
