@@ -20,11 +20,19 @@ const HomePage = () => {
     const loadSettings = async () => {
       try {
         const res = await fetch('/import-export-web/settings', { credentials: 'include' });
-        if (!res.ok) return;
+        console.log('Settings response status:', res.status);
+        if (!res.ok) {
+          console.log('Settings request failed:', res.status);
+          return;
+        }
         const data = await res.json();
-        if (isMounted) setEnableImport(!!data.enableImport);
-      } catch (_) {
-        // ignore
+        console.log('Settings data:', data);
+        if (isMounted) {
+          setEnableImport(!!data.enableImport);
+          console.log('enableImport set to:', !!data.enableImport);
+        }
+      } catch (err) {
+        console.error('Settings request error:', err);
       }
     };
     loadSettings();
